@@ -8,13 +8,13 @@ echo "=========================================================="
 SINGBOX_VER="v1.11.4"
 WORKDIR="$(pwd)/build_singbox"
 
-# 1. 检查必要环境
+# 1. 检查必要环境并安装 sing-box 配套 gomobile 工具
 command -v go >/dev/null 2>&1 || { echo "❌ 请先安装 Go 1.22+"; exit 1; }
-command -v gomobile >/dev/null 2>&1 || { 
-  echo "⚠️ 正在安装 gomobile..."
-  go install golang.org/x/mobile/cmd/gomobile@latest
-  gomobile init
-}
+echo ">> 正在安装 sing-box 配套 gomobile 构建套件 (sagernet/gomobile)..."
+go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.4
+go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.4
+gomobile init
+
 if [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_NDK_HOME:-}" ]; then
   echo "⚠️ 警告: 未检测到 ANDROID_HOME 或 ANDROID_NDK_HOME 环境变量"
 fi
@@ -25,41 +25,69 @@ mkdir -p "$WORKDIR"
 git clone --depth 1 --branch "$SINGBOX_VER" https://github.com/sagernet/sing-box.git "$WORKDIR"
 cd "$WORKDIR"
 
-echo ">> 正在注入极限裁剪版 include/inbound.go ..."
-cat << 'EOF' > include/inbound.go
+echo ">> 正在重构 include/registry.go (仅保留 tun 与 direct, block, dns)..."
+cat << 'EOF' > include/registry.go
 package include
 
 import (
-	_ "github.com/sagernet/sing-box/inbound/tun"
+	"github.com/sagernet/sing-box/adapter/endpoint"
+	"github.com/sagernet/sing-box/adapter/inbound"
+	"github.com/sagernet/sing-box/adapter/outbound"
+	"github.com/sagernet/sing-box/protocol/block"
+	"github.com/sagernet/sing-box/protocol/direct"
+	"github.com/sagernet/sing-box/protocol/dns"
+	"github.com/sagernet/sing-box/protocol/tun"
 )
+
+func InboundRegistry() *inbound.Registry {
+	registry := inbound.NewRegistry()
+	tun.RegisterInbound(registry)
+	return registry
+}
+
+func OutboundRegistry() *outbound.Registry {
+	registry := outbound.NewRegistry()
+	direct.RegisterOutbound(registry)
+	block.RegisterOutbound(registry)
+	dns.RegisterOutbound(registry)
+	registerQUICOutbounds(registry)
+	return registry
+}
+
+func EndpointRegistry() *endpoint.Registry {
+	return endpoint.NewRegistry()
+}
 EOF
 
-echo ">> 正在注入极限裁剪版 include/outbound.go ..."
-cat << 'EOF' > include/outbound.go
+echo ">> 正在重构 include/quic.go (仅保留 hysteria2 出站)..."
+cat << 'EOF' > include/quic.go
+//go:build with_quic
+
 package include
 
 import (
-	_ "github.com/sagernet/sing-box/outbound/block"
-	_ "github.com/sagernet/sing-box/outbound/direct"
-	_ "github.com/sagernet/sing-box/outbound/dns"
-	_ "github.com/sagernet/sing-box/outbound/hysteria2"
+	"github.com/sagernet/sing-box/adapter/inbound"
+	"github.com/sagernet/sing-box/adapter/outbound"
+	"github.com/sagernet/sing-box/protocol/hysteria2"
 )
+
+func registerQUICInbounds(registry *inbound.Registry) {
+}
+
+func registerQUICOutbounds(registry *outbound.Registry) {
+	hysteria2.RegisterOutbound(registry)
+}
 EOF
-
-echo ">> 正在排空 Clash / V2Ray API 引用 ..."
-[ -f include/v2ray.go ] && echo "package include" > include/v2ray.go
-[ -f include/clash.go ] && echo "package include" > include/clash.go
-
-echo ">> 注入 gomobile 依赖图 (go get gobind)..."
-go get -tool golang.org/x/mobile/cmd/gobind 2>/dev/null || go get golang.org/x/mobile/bind 2>/dev/null || true
 
 echo ">> 开始执行 gomobile bind 交叉编译 (arm64-v8a)..."
 gomobile bind -v \
-  -androidapi 26 \
   -target=android/arm64 \
-  -tags="with_quic" \
+  -androidapi=26 \
+  -javapkg=io.nekohasekai \
+  -libname=box \
   -trimpath \
   -ldflags="-s -w -buildid=" \
+  -tags="with_quic" \
   -o libbox.aar \
   ./experimental/libbox
 

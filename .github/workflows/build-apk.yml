@@ -36,47 +36,80 @@ jobs:
 
       - name: Build Stripped sing-box AAR (gomobile)
         run: |
-          go install golang.org/x/mobile/cmd/gomobile@latest
-          go install golang.org/x/mobile/cmd/gobind@latest
+          # 1. 安装 sing-box 官方指定 gomobile 构建套件 (sagernet/gomobile)
+          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.4
+          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.4
           gomobile init
           
+          # 2. 克隆对应版本的 sing-box
           git clone --depth 1 --branch v1.11.4 https://github.com/sagernet/sing-box.git sing-box-build
           cd sing-box-build
           
-          # 注入 AST 裁剪后的出入站注册表
-          cat << 'EOF' > include/inbound.go
+          # 3. 裁剪 include/registry.go (仅保留 tun 与 direct, block, dns)
+          cat << 'EOF' > include/registry.go
           package include
+
           import (
-          	_ "github.com/sagernet/sing-box/inbound/tun"
+          	"github.com/sagernet/sing-box/adapter/endpoint"
+          	"github.com/sagernet/sing-box/adapter/inbound"
+          	"github.com/sagernet/sing-box/adapter/outbound"
+          	"github.com/sagernet/sing-box/protocol/block"
+          	"github.com/sagernet/sing-box/protocol/direct"
+          	"github.com/sagernet/sing-box/protocol/dns"
+          	"github.com/sagernet/sing-box/protocol/tun"
           )
+
+          func InboundRegistry() *inbound.Registry {
+          	registry := inbound.NewRegistry()
+          	tun.RegisterInbound(registry)
+          	return registry
+          }
+
+          func OutboundRegistry() *outbound.Registry {
+          	registry := outbound.NewRegistry()
+          	direct.RegisterOutbound(registry)
+          	block.RegisterOutbound(registry)
+          	dns.RegisterOutbound(registry)
+          	registerQUICOutbounds(registry)
+          	return registry
+          }
+
+          func EndpointRegistry() *endpoint.Registry {
+          	return endpoint.NewRegistry()
+          }
           EOF
 
-          cat << 'EOF' > include/outbound.go
+          # 4. 裁剪 include/quic.go (仅保留 hysteria2)
+          cat << 'EOF' > include/quic.go
+          //go:build with_quic
+
           package include
+
           import (
-          	_ "github.com/sagernet/sing-box/outbound/block"
-          	_ "github.com/sagernet/sing-box/outbound/direct"
-          	_ "github.com/sagernet/sing-box/outbound/dns"
-          	_ "github.com/sagernet/sing-box/outbound/hysteria2"
+          	"github.com/sagernet/sing-box/adapter/inbound"
+          	"github.com/sagernet/sing-box/adapter/outbound"
+          	"github.com/sagernet/sing-box/protocol/hysteria2"
           )
+
+          func registerQUICInbounds(registry *inbound.Registry) {
+          }
+
+          func registerQUICOutbounds(registry *outbound.Registry) {
+          	hysteria2.RegisterOutbound(registry)
+          }
           EOF
 
-          echo "package include" > include/v2ray.go
-          echo "package include" > include/clash.go
-
-          # 修复 gomobile: missing golang.org/x/mobile dependency
-          go get -tool golang.org/x/mobile/cmd/gobind || go get golang.org/x/mobile/bind || true
-
-          # 确保输出目录存在
+          # 5. 确保产物目录就绪并调用 gomobile bind
           mkdir -p ../android/app/libs
-
           echo "Executing gomobile bind..."
           gomobile bind -v \
-            -androidapi 26 \
             -target=android/arm64 \
-            -tags="with_quic" \
+            -androidapi=26 \
+            -javapkg=io.nekohasekai \
+            -libname=box \
             -trimpath \
             -ldflags="-s -w -buildid=" \
+            -tags="with_quic" \
             -o ../android/app/libs/libbox.aar \
             ./experimental/libbox
             

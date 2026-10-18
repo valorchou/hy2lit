@@ -18,16 +18,14 @@ export function ProjectExporter() {
 
       // 1. Root and scripts
       const trimScript = PHASE_1_FILES.find(f => f.id === 'build-script-sh')?.code || '';
-      const githubWorkflow = PHASE_1_FILES.find(f => f.id === 'github-action-yml')?.code || '';
       const fullApkWorkflow = PHASE_1_FILES.find(f => f.id === 'github-action-full-apk')?.code || '';
-      const outboundGo = PHASE_1_FILES.find(f => f.id === 'outbound-go')?.code || '';
-      const inboundGo = PHASE_1_FILES.find(f => f.id === 'inbound-go')?.code || '';
+      const registryGo = PHASE_1_FILES.find(f => f.id === 'registry-go')?.code || '';
+      const quicGo = PHASE_1_FILES.find(f => f.id === 'quic-go')?.code || '';
 
       zip.file('scripts/trim_and_build.sh', trimScript);
-      zip.file('.github/workflows/build-libbox.yml', githubWorkflow);
       zip.file('.github/workflows/build-apk.yml', fullApkWorkflow);
-      zip.file('sing-box-patches/include/outbound.go', outboundGo);
-      zip.file('sing-box-patches/include/inbound.go', inboundGo);
+      zip.file('sing-box-patches/include/registry.go', registryGo);
+      zip.file('sing-box-patches/include/quic.go', quicGo);
 
       // 2. Gradle root
       const rootGradle = ANDROID_RESOURCES.find(r => r.name.includes('build.gradle.kts (Root)'))?.content || '';
