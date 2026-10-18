@@ -302,5 +302,107 @@ jobs:
             libbox.aar
             geoip-cn.srs
 `
+  },
+  {
+    id: 'github-action-full-apk',
+    name: 'build-apk.yml',
+    path: '.github/workflows/build-apk.yml',
+    badge: '一键云端自动编译 Release APK',
+    description: '端到端全自动 CI/CD：自动编译 Go 裁剪内核 -> 自动组装 Android 项目 -> 执行 R8 混淆与 Gradle assembleRelease -> 直接输出可下载的 Release APK！',
+    language: 'yaml',
+    code: `name: Build Hy2Mini Release APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+
+jobs:
+  build:
+    name: Build and Assemble Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Go 1.22
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+
+      - name: Set up Android NDK r26c
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26c
+          add-to-path: true
+
+      - name: Build Stripped sing-box AAR (gomobile)
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
+          
+          git clone --depth 1 --branch v1.11.4 https://github.com/sagernet/sing-box.git sing-box-build
+          cd sing-box-build
+          
+          # 注入 AST 裁剪后的出入站注册表
+          cat << 'EOF' > include/inbound.go
+          package include
+          import (
+          	_ "github.com/sagernet/sing-box/inbound/tun"
+          )
+          EOF
+
+          cat << 'EOF' > include/outbound.go
+          package include
+          import (
+          	_ "github.com/sagernet/sing-box/outbound/block"
+          	_ "github.com/sagernet/sing-box/outbound/direct"
+          	_ "github.com/sagernet/sing-box/outbound/dns"
+          	_ "github.com/sagernet/sing-box/outbound/hysteria2"
+          )
+          EOF
+
+          echo "package include" > include/v2ray.go
+          echo "package include" > include/clash.go
+
+          echo "Executing gomobile bind..."
+          gomobile bind -v \\
+            -androidapi 26 \\
+            -target=android/arm64 \\
+            -tags="with_quic" \\
+            -trimpath \\
+            -ldflags="-s -w -buildid=" \\
+            -o ../app/libs/libbox.aar \\
+            ./experimental/libbox
+            
+          cd ..
+          mkdir -p app/src/main/assets
+          curl -sSL -o app/src/main/assets/geoip-cn.srs https://github.com/SagerNet/sing-geoip/raw/rule-set/geoip-cn.srs
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build Release APK with Gradle
+        run: |
+          chmod +x gradlew || true
+          gradle assembleRelease --stacktrace
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hy2Mini-Release-APK
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 30
+`
   }
 ];

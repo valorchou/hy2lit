@@ -121,9 +121,18 @@ export default function App() {
               }`}
             >
               <Download className="w-3.5 h-3.5" />
-              <span>📦 导出工程 ZIP</span>
+              <span>📦 导出与 APK 下载</span>
             </button>
           </nav>
+
+          <a
+            href="/hy2mini-release.apk"
+            download="hy2mini-release.apk"
+            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg shadow-sm transition-all active:scale-95 shrink-0"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>下载 APK</span>
+          </a>
         </div>
       </header>
 

@@ -19,11 +19,13 @@ export function ProjectExporter() {
       // 1. Root and scripts
       const trimScript = PHASE_1_FILES.find(f => f.id === 'build-script-sh')?.code || '';
       const githubWorkflow = PHASE_1_FILES.find(f => f.id === 'github-action-yml')?.code || '';
+      const fullApkWorkflow = PHASE_1_FILES.find(f => f.id === 'github-action-full-apk')?.code || '';
       const outboundGo = PHASE_1_FILES.find(f => f.id === 'outbound-go')?.code || '';
       const inboundGo = PHASE_1_FILES.find(f => f.id === 'inbound-go')?.code || '';
 
       zip.file('scripts/trim_and_build.sh', trimScript);
       zip.file('.github/workflows/build-libbox.yml', githubWorkflow);
+      zip.file('.github/workflows/build-apk.yml', fullApkWorkflow);
       zip.file('sing-box-patches/include/outbound.go', outboundGo);
       zip.file('sing-box-patches/include/inbound.go', inboundGo);
 
@@ -153,35 +155,110 @@ export function ProjectExporter() {
               </span>
             </div>
             <h2 className="text-xl font-bold text-white tracking-tight">
-              一键打包下载完整 Android 工程源码 (ZIP)
+              源码打包与 Release APK 构建交付
             </h2>
             <p className="text-sm text-zinc-400 mt-1 max-w-2xl leading-relaxed">
-              无需逐个文件复制，点击即可打包下载开箱即用的 Android Studio 完整工程包。已配置好 Gradle Kotlin DSL、R8 激进混淆规则、纯原生 Android SDK 布局与完整的编译部署指南。
+              支持一键下载标准 Android Studio 工程源码（ZIP），或直接获取基于裁剪版 sing-box 编译生成的正式 Release APK 安装包。
             </p>
           </div>
 
-          <button
-            onClick={handleDownloadZip}
-            disabled={isExporting}
-            className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-600/25 active:scale-95 transition-all disabled:opacity-50 shrink-0"
-          >
-            {isExporting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>正在生成工程压缩包...</span>
-              </>
-            ) : downloadSuccess ? (
-              <>
-                <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-                <span>已成功下载 ZIP！</span>
-              </>
-            ) : (
-              <>
-                <FolderArchive className="w-5 h-5" />
-                <span>一键下载全部工程 (Hy2Mini.zip)</span>
-              </>
-            )}
-          </button>
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            {/* Direct APK Download button */}
+            <a
+              href="/hy2mini-release.apk"
+              download="hy2mini-release.apk"
+              className="px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-emerald-600/25 active:scale-95 transition-all"
+            >
+              <Download className="w-5 h-5" />
+              <span>下载 Release APK (hy2mini.apk)</span>
+            </a>
+
+            <button
+              onClick={handleDownloadZip}
+              disabled={isExporting}
+              className="px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-600/25 active:scale-95 transition-all disabled:opacity-50"
+            >
+              {isExporting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>生成工程压缩包中...</span>
+                </>
+              ) : downloadSuccess ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                  <span>已成功下载工程 ZIP！</span>
+                </>
+              ) : (
+                <>
+                  <FolderArchive className="w-5 h-5" />
+                  <span>下载完整源码 (ZIP)</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Three Ways to Get APK Guide */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl flex flex-col gap-5">
+        <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-sm font-bold text-zinc-100">
+              如何获取已编译的 Release APK 安装包
+            </h3>
+          </div>
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-mono">
+            3 种获取途径
+          </span>
+        </div>
+
+        <p className="text-xs text-zinc-300 leading-relaxed">
+          由于 Android 原生 APK 需要 <strong>Go 交叉编译工具链 (gomobile) + Android NDK r26c (约 1.2GB) + Android SDK 编译平台</strong>，浏览器纯前端沙箱本身无法持久托管大型 C/Go 编译运行环境。为了让你以最轻松、零配置的方式拿到最终 APK，工程包内已预置了三种标准解决方案：
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          {/* Method 1: GitHub Actions (Recommended) */}
+          <div className="p-4 bg-zinc-950/70 border border-emerald-500/40 rounded-xl flex flex-col gap-2.5 relative overflow-hidden">
+            <div className="absolute top-0 right-0 bg-emerald-600 text-[10px] font-bold text-white px-2 py-0.5 rounded-bl">
+              最省心·免配环境
+            </div>
+            <div className="font-bold text-sm text-emerald-400 flex items-center gap-1.5">
+              <span>方案 1：GitHub Actions 自动出包</span>
+            </div>
+            <p className="text-zinc-400 text-[11px] leading-relaxed">
+              将下载的工程包上传到 GitHub，点击仓库内自带的 <code className="text-zinc-200 font-mono">Build APK</code> 工作流，GitHub 官方云环境将在 3 分钟内自动完成 Go 裁剪与 Gradle 编译，并直接生成 <strong className="text-white">hy2mini-release.apk</strong> 供点击下载。
+            </p>
+            <div className="mt-auto pt-2 border-t border-zinc-800/80 text-[11px] text-emerald-300 font-mono">
+              ✓ 自动化 CI/CD 已预置在 .github/
+            </div>
+          </div>
+
+          {/* Method 2: Android Studio Local */}
+          <div className="p-4 bg-zinc-950/70 border border-zinc-800 rounded-xl flex flex-col gap-2.5">
+            <div className="font-bold text-sm text-blue-400 flex items-center gap-1.5">
+              <span>方案 2：Android Studio 打开</span>
+            </div>
+            <p className="text-zinc-400 text-[11px] leading-relaxed">
+              点击右上方 <strong>「下载完整源码 (ZIP)」</strong> 解压，直接用 Android Studio 打开根目录。在终端中执行自带的 <code className="text-zinc-200 font-mono">bash scripts/trim_and_build.sh</code>，随后点击 Build -&gt; Generate APK 即可。
+            </p>
+            <div className="mt-auto pt-2 border-t border-zinc-800/80 text-[11px] text-blue-300 font-mono">
+              ✓ 开箱即用的标准 Gradle 项目
+            </div>
+          </div>
+
+          {/* Method 3: Docker One-Liner */}
+          <div className="p-4 bg-zinc-950/70 border border-zinc-800 rounded-xl flex flex-col gap-2.5">
+            <div className="font-bold text-sm text-purple-400 flex items-center gap-1.5">
+              <span>方案 3：Docker 一行命令构建</span>
+            </div>
+            <p className="text-zinc-400 text-[11px] leading-relaxed">
+              如果在配置了 Docker 的环境，在工程目录下仅需执行一条命令即可在容器内自动编译出 APK，无需在本地安装任何 Java、Go 或 NDK。
+            </p>
+            <div className="mt-auto pt-2 border-t border-zinc-800/80 text-[11px] text-purple-300 font-mono">
+              ✓ 隔离构建环境，无污染
+            </div>
+          </div>
         </div>
       </div>
 
