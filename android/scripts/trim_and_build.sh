@@ -50,6 +50,9 @@ echo ">> 正在排空 Clash / V2Ray API 引用 ..."
 [ -f include/v2ray.go ] && echo "package include" > include/v2ray.go
 [ -f include/clash.go ] && echo "package include" > include/clash.go
 
+echo ">> 注入 gomobile 依赖图 (go get gobind)..."
+go get -tool golang.org/x/mobile/cmd/gobind 2>/dev/null || go get golang.org/x/mobile/bind 2>/dev/null || true
+
 echo ">> 开始执行 gomobile bind 交叉编译 (arm64-v8a)..."
 gomobile bind -v \
   -androidapi 26 \

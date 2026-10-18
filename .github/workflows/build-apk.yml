@@ -37,6 +37,7 @@ jobs:
       - name: Build Stripped sing-box AAR (gomobile)
         run: |
           go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
           gomobile init
           
           git clone --depth 1 --branch v1.11.4 https://github.com/sagernet/sing-box.git sing-box-build
@@ -63,6 +64,12 @@ jobs:
           echo "package include" > include/v2ray.go
           echo "package include" > include/clash.go
 
+          # 修复 gomobile: missing golang.org/x/mobile dependency
+          go get -tool golang.org/x/mobile/cmd/gobind || go get golang.org/x/mobile/bind || true
+
+          # 确保输出目录存在
+          mkdir -p ../android/app/libs
+
           echo "Executing gomobile bind..."
           gomobile bind -v \
             -androidapi 26 \
@@ -83,7 +90,6 @@ jobs:
       - name: Build Release APK with Gradle
         run: |
           cd android
-          chmod +x gradlew || true
           gradle assembleRelease --stacktrace
 
       - name: Upload Release APK
