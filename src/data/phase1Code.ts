@@ -405,6 +405,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.10.2'
 
       - name: Build Release APK with Gradle
         run: |

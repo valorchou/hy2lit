@@ -12,7 +12,7 @@ echo "=========================================================="
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 export ANDROID_HOME=/opt/android-sdk
 export ANDROID_NDK_HOME=/opt/android-sdk/ndk/26.2.11394342
-export PATH=/opt/gradle/gradle-8.7/bin:/usr/local/go/bin:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/root/go/bin:$PATH
+export PATH=/opt/gradle/gradle-8.10.2/bin:/usr/local/go/bin:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/root/go/bin:$PATH
 
 # Step 1: Cmdline-tools
 if [ ! -d "/opt/android-sdk/cmdline-tools/latest" ]; then
@@ -36,11 +36,11 @@ if [ ! -d "$ANDROID_NDK_HOME" ]; then
     rm -f /tmp/ndk.zip
 fi
 
-# Step 3: Gradle 8.7
-if [ ! -d "/opt/gradle/gradle-8.7" ]; then
-    echo ">> [3/8] 安装 Gradle 8.7..."
+# Step 3: Gradle 8.10.2
+if [ ! -d "/opt/gradle/gradle-8.10.2" ]; then
+    echo ">> [3/8] 安装 Gradle 8.10.2..."
     mkdir -p /opt/gradle
-    curl -sSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.7-bin.zip
+    curl -sSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.10.2-bin.zip
     unzip -q /tmp/gradle.zip -d /opt/gradle
     rm -f /tmp/gradle.zip
 fi
