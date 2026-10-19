@@ -17,8 +17,11 @@ import android.os.ParcelFileDescriptor
 import io.nekohasekai.libbox.BoxService
 import io.nekohasekai.libbox.InterfaceUpdateListener
 import io.nekohasekai.libbox.Libbox
+import io.nekohasekai.libbox.NetworkInterfaceIterator
+import io.nekohasekai.libbox.Notification as LibboxNotification
 import io.nekohasekai.libbox.PlatformInterface
 import io.nekohasekai.libbox.TunOptions
+import io.nekohasekai.libbox.WIFIState
 import java.io.File
 
 class Hy2VpnService : VpnService(), PlatformInterface {
@@ -108,8 +111,7 @@ class Hy2VpnService : VpnService(), PlatformInterface {
     }
 
     /**
-     * PlatformInterface: openTun 实现
-     * 建立 TUN 接口、设置路由、配置黑名单分流应用，并将原生文件描述符转交 Go 内核
+     * PlatformInterface: 建立 TUN 虚拟网卡
      */
     override fun openTun(options: TunOptions): Int {
         val builder = Builder()
@@ -139,16 +141,28 @@ class Hy2VpnService : VpnService(), PlatformInterface {
         return pfd.detachFd()
     }
 
-    /**
-     * PlatformInterface: 保护物理套接字不被 TUN 重定向导致死循环
-     */
+    override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
+
     override fun autoDetectInterfaceControl(fd: Int) {
         protect(fd)
     }
 
-    /**
-     * PlatformInterface: 监听默认物理网卡变化 (Wi-Fi <-> 5G)，通知 Go 内核平滑迁移 QUIC 握手
-     */
+    override fun writeLog(message: String) {}
+
+    override fun useProcFS(): Boolean = false
+
+    override fun findConnectionOwner(
+        ipProtocol: Int,
+        sourceAddress: String,
+        sourcePort: Int,
+        destinationAddress: String,
+        destinationPort: Int
+    ): Int = 0
+
+    override fun packageNameByUid(uid: Int): String = ""
+
+    override fun uidByPackageName(packageName: String): Int = 0
+
     override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -167,6 +181,25 @@ class Hy2VpnService : VpnService(), PlatformInterface {
         connectivityManager?.registerNetworkCallback(request, callback)
     }
 
+    override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
+        networkCallback?.let {
+            connectivityManager?.unregisterNetworkCallback(it)
+            networkCallback = null
+        }
+    }
+
+    override fun getInterfaces(): NetworkInterfaceIterator? = null
+
+    override fun underNetworkExtension(): Boolean = false
+
+    override fun includeAllNetworks(): Boolean = false
+
+    override fun readWIFIState(): WIFIState? = null
+
+    override fun clearDNSCache() {}
+
+    override fun sendNotification(notification: LibboxNotification?) {}
+
     private fun notifyInterface(network: Network, listener: InterfaceUpdateListener) {
         val linkProps = connectivityManager?.getLinkProperties(network) ?: return
         val caps = connectivityManager?.getNetworkCapabilities(network) ?: return
@@ -174,7 +207,6 @@ class Hy2VpnService : VpnService(), PlatformInterface {
         val isExpensive = !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
         val isConstrained = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_CONGESTED).not()
 
-        // 查找接口索引
         val ifIndex = try {
             java.net.NetworkInterface.getByName(ifName)?.index ?: 0
         } catch (_: Exception) {

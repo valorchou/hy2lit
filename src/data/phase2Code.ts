@@ -381,16 +381,28 @@ class Hy2VpnService : VpnService(), PlatformInterface {
         return pfd.detachFd()
     }
 
-    /**
-     * PlatformInterface: 保护物理套接字不被 TUN 重定向导致死循环
-     */
+    override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
+
     override fun autoDetectInterfaceControl(fd: Int) {
         protect(fd)
     }
 
-    /**
-     * PlatformInterface: 监听默认物理网卡变化 (Wi-Fi <-> 5G)，通知 Go 内核平滑迁移 QUIC 握手
-     */
+    override fun writeLog(message: String) {}
+
+    override fun useProcFS(): Boolean = false
+
+    override fun findConnectionOwner(
+        ipProtocol: Int,
+        sourceAddress: String,
+        sourcePort: Int,
+        destinationAddress: String,
+        destinationPort: Int
+    ): Int = 0
+
+    override fun packageNameByUid(uid: Int): String = ""
+
+    override fun uidByPackageName(packageName: String): Int = 0
+
     override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -408,6 +420,25 @@ class Hy2VpnService : VpnService(), PlatformInterface {
         networkCallback = callback
         connectivityManager?.registerNetworkCallback(request, callback)
     }
+
+    override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
+        networkCallback?.let {
+            connectivityManager?.unregisterNetworkCallback(it)
+            networkCallback = null
+        }
+    }
+
+    override fun getInterfaces(): io.nekohasekai.libbox.NetworkInterfaceIterator? = null
+
+    override fun underNetworkExtension(): Boolean = false
+
+    override fun includeAllNetworks(): Boolean = false
+
+    override fun readWIFIState(): io.nekohasekai.libbox.WIFIState? = null
+
+    override fun clearDNSCache() {}
+
+    override fun sendNotification(notification: io.nekohasekai.libbox.Notification?) {}
 
     private fun notifyInterface(network: Network, listener: InterfaceUpdateListener) {
         val linkProps = connectivityManager?.getLinkProperties(network) ?: return
